@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Reports</h1>
+<table>
+    <tr>
+        <td>Total Accounts Opened</td>
+    </tr>
+    <tr>
+        <td>{{ accounts_opened }}</td>
+    </tr>
+    <tr>
+        <td>Total Accounts Closed</td>
+    </tr>
+    <tr>
+        <td>{{ accounts_closed }}</td>
+    </tr>
+</table>
+<hr>
+
+<script>
+    function getAccount(e) {
+        e.preventDefault();
+        accountId = document.getElementById("getAccountId").value;
+        location.href = `/accounts/${accountId}`;
+    }
+</script>
+{% endblock %}

@@ -7,7 +7,7 @@ from flask import Flask, render_template, url_for
 from uuid import UUID
 
 import bankaccounts.exceptions
-from bankaccounts.application import BankAccounts
+from bankaccounts.application import BankAccounts, Reports
 
 class OpenAccountForm(FlaskForm):
     full_name = StringField('Full Name', validators=[v.DataRequired()])
@@ -34,9 +34,18 @@ class OverdraftLimitForm(FlaskForm):
     limit = DecimalField('Overdraft Limit', validators=[v.DataRequired()])
     submit = SubmitField('Set Overdraft Limit')
 
+class AdminForm(FlaskForm):
+    pass
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'change-me')
-accounts = BankAccounts()
+
+from eventsourcing.system import System, SingleThreadedRunner
+system = System([[BankAccounts, Reports]])
+runner = SingleThreadedRunner(system)
+runner.start()
+accounts = runner.get(BankAccounts)
+reports = runner.get(Reports)
 
 @app.route('/')
 def home():
@@ -112,3 +121,10 @@ def handle_account_closed(e):
 @app.errorhandler(bankaccounts.exceptions.InsufficientFundsError)
 def handle_insufficient_funds(e):
     return render_template('error.html', message='Insufficient Funds')
+
+@app.route('/admin', methods=['GET'])
+def show_admin():
+    accounts_opened = reports.get_accounts_opened().count
+    accounts_closed = reports.get_accounts_closed().count
+    admin = AdminForm(accounts_opened=accounts_opened, accounts_closed=accounts_closed)
+    return render_template('admin.html', accounts_opened=accounts_opened, accounts_closed=accounts_closed)

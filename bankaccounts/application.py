@@ -63,3 +63,58 @@ class BankAccounts(Application):
         account = self.get_account(account_id)
         account.close()
         self.save(account)
+
+from functools import singledispatchmethod
+from logging import getLogger
+from eventsourcing.system import ProcessApplication, ProcessingEvent
+from eventsourcing.domain import AggregateEvent
+from bankaccounts.aggregate import Opened, Closed, AccountsOpened, AccountsClosed
+
+class Reports(ProcessApplication):
+    @singledispatchmethod
+    def policy(self, domain_event: AggregateEvent, processing_event: ProcessingEvent):
+        pass
+        # self._log_info("Opened: %s", domain_event)
+
+    @policy.register(Opened)
+    def _(self, domain_event: Opened, processing_event: ProcessingEvent):
+        self._log_info("Opened: %s", domain_event)
+
+        accounts_opened = self.get_accounts_opened()
+        accounts_opened.increment_count(1)
+        processing_event.collect_events(accounts_opened)
+
+    @policy.register(Closed)
+    def _(self, domain_event: Opened, processing_event: ProcessingEvent):
+        self._log_info("Closed: %s", domain_event)
+
+        accounts_opened = self.get_accounts_opened()
+        accounts_closed = self.get_accounts_closed()
+
+        accounts_opened.decrement_count(1)
+        accounts_closed.increment_count(1)
+
+        processing_event.collect_events(accounts_opened, accounts_closed)
+
+    def get_accounts_opened(self) -> AccountsOpened:
+        try:
+            accounts_opened = self.repository.get(AccountsOpened.create_id())
+        except AggregateNotFound:
+            accounts_opened = AccountsOpened(count=0)
+            self.save(accounts_opened)
+
+        return accounts_opened
+
+    def get_accounts_closed(self) -> AccountsClosed:
+        try:
+            accounts_closed = self.repository.get(AccountsClosed.create_id())
+        except AggregateNotFound:
+            accounts_closed = AccountsClosed(count=0)
+            accounts_closed_id = self.save(accounts_closed)
+            assert accounts_closed_id
+
+        return accounts_closed
+
+    def _log_info(self, message, *args, **kwargs):
+        getLogger().info(message, *args, **kwargs)
+

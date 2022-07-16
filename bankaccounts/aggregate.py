@@ -82,4 +82,37 @@ class BankAccount(Aggregate):
             aggregate.overdraft_limit = self.overdraft_limit
 
     def close(self) -> None:
+        self.check_account_is_not_closed()
         self.trigger_event(Closed)
+
+from uuid import UUID, uuid5, NAMESPACE_URL
+from eventsourcing.domain import event
+from dataclasses import dataclass
+
+@dataclass
+class AccountsOpened(Aggregate):
+    count: int
+
+    @classmethod
+    def create_id(cls) -> UUID:
+        return uuid5(NAMESPACE_URL, "bankaccounts/reports/AccountOpened")
+
+    @event("Increment")
+    def increment_count(self, count):
+        self.count += count
+
+    @event("Decrement")
+    def decrement_count(self, count):
+        self.count -= count
+
+@dataclass
+class AccountsClosed(Aggregate):
+    count: int
+
+    @classmethod
+    def create_id(cls) -> UUID:
+        return uuid5(NAMESPACE_URL, "bankaccounts/reports/AccountClosed")
+
+    @event("Increment")
+    def increment_count(self, count):
+        self.count += count
